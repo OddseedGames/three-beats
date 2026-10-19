@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1116">
+  <meta name="description" content="Три такта — пошаговый файтинг на Rust. Прочитай соперника, собери комбинацию и выиграй турнир.">
+  <title>Три такта · OddseedGames</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='6' fill='%230b1116'/%3E%3Cpath d='M9 8v16M16 8v16M23 8v16' stroke='%23efbd66' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header><span class="brand"><b>✳</b> oddseed<span>games</span></span><span class="edition">PLAY LAB / ЭКСПЕРИМЕНТ 003</span></header>
+  <main>
+    <div class="game-frame">
+      <canvas id="glcanvas" tabindex="0" aria-label="Три такта. Enter начать и исполнить серию. Клавиши 1-8 выбрать приём, Backspace отменить, C очистить. H правила, P пауза, R новый турнир, M звук."></canvas>
+      <output id="game-status" class="sr-only" aria-live="off">Бойцы готовятся.</output>
+      <div id="loading" role="status"><span class="mark">III</span><strong>Готовим ринг</strong><span>Три такта. Один точный план.</span></div>
+      <div id="load-error" role="alert" hidden><strong>Не удалось начать бой</strong><p>Обнови страницу. Для игры нужны WebGL и WebAssembly.</p><button onclick="location.reload()">Попробовать снова</button></div>
+    </div>
+    <p class="hint">Все приёмы доступны мышью или клавишами 1-8. Время выбора не ограничено. <button id="fullscreen">На весь экран</button></p>
+  </main>
+  <footer><span>МАЛЕНЬКИЕ ИГРЫ. ЛЮБОПЫТНЫЕ ЭКСПЕРИМЕНТЫ.</span><span>Создано с помощью ИИ · OddseedGames © 2026</span></footer>
+  <script src="mq_js_bundle.js"></script>
+  <script>
+    const timer = setTimeout(showLoadError, 30000);
+    function showLoadError() {
+      clearTimeout(timer);
+      document.querySelector('#loading').hidden = true;
+      document.querySelector('#load-error').hidden = false;
+    }
+    miniquad_add_plugin({
+      name: 'three_beats_lifecycle', version: 1,
+      register_plugin(imports) {
+        imports.env.three_beats_ready = () => {
+          clearTimeout(timer);
+          document.querySelector('#loading').hidden = true;
+          document.documentElement.classList.add('game-ready');
+          document.querySelector('canvas').focus();
+        };
+        imports.env.three_beats_status = (phase, stage, round, beat, playerHealth, enemyHealth, playerEnergy, enemyEnergy, playerCell, enemyCell, slots, queued, enemyPlan, paused, help) => {
+          const status = document.querySelector('#game-status');
+          Object.assign(status.dataset, {phase, stage, round, beat, playerHealth, enemyHealth, playerEnergy, enemyEnergy, playerCell, enemyCell, slots, queued, enemyPlan, paused, help});
+          status.value = `${['Ожидание', 'Планирование', 'Бой', 'Бой выигран', 'Поражение', 'Чемпион'][phase]}. Бой ${stage + 1}, раунд ${round}. Здоровье ${playerHealth}, соперник ${enemyHealth}. Выбрано ${slots} из трёх тактов.`;
+        };
+      }
+    });
+    function pause() {
+      if (typeof wasm_exports !== 'undefined' && wasm_exports.three_beats_pause) wasm_exports.three_beats_pause();
+    }
+    document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
+    window.addEventListener('blur', pause);
+    window.addEventListener('error', showLoadError);
+    window.addEventListener('unhandledrejection', showLoadError);
+    document.querySelector('#fullscreen').addEventListener('click', async () => {
+      const frame = document.querySelector('.game-frame');
+      if (frame.requestFullscreen) {
+        try { await frame.requestFullscreen(); } catch (error) { console.warn(error); }
+      }
+      document.querySelector('canvas').focus();
+    });
+    document.querySelector('canvas').addEventListener('contextmenu', event => event.preventDefault());
+    load('three-beats.wasm');
+  </script>
+</body>
+</html>

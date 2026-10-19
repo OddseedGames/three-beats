@@ -1,0 +1,34 @@
+async () => {
+  const c=document.querySelector('canvas');
+  const s=()=>Object.fromEntries(Object.entries(document.querySelector('#game-status').dataset).map(([k,v])=>[k,Number(v)]));
+  const wait=ms=>new Promise(r=>setTimeout(r,ms));
+  const check=(value,message)=>{if(!value)throw new Error(message);};
+  const until=async predicate=>{for(let i=0;i<400;i++){if(predicate(s()))return;await wait(25);}throw new Error('State timeout: '+JSON.stringify(s()));};
+  const key=async code=>{c.dispatchEvent(new KeyboardEvent('keydown',{code,bubbles:true}));await wait(60);c.dispatchEvent(new KeyboardEvent('keyup',{code,bubbles:true}));await wait(60);};
+  const queue=async keys=>{for(const digit of keys){const slots=s().slots+(digit==='2'||digit==='3'?2:1);await key('Digit'+digit);check(s().slots===slots,'Queue failed');}};
+  c.focus();
+  check(document.querySelector('#loading').hidden,'Loading remains');
+  check(document.querySelector('#load-error').hidden,'Boot failed');
+  if(s().phase===0)await key('Enter');else await key('KeyR');
+  check(s().phase===1,'Start failed');
+  const intent=s().enemyPlan;
+  await queue('2');await key('Digit2');check(s().slots===2,'Capacity exceeded');
+  check(s().enemyPlan===intent,'Enemy changed its plan');
+  await key('Backspace');check(s().slots===0,'Undo failed');
+  await key('Enter');check(s().phase===1,'Partial plan launched');
+  await queue('444');await key('Enter');check(s().phase===2,'Playback failed');
+  await key('KeyP');check(s().paused===1,'Pause failed');const paused=s();await wait(250);
+  check(JSON.stringify(s())===JSON.stringify(paused),'Paused state changed');
+  await key('Enter');window.dispatchEvent(new Event('blur'));await until(x=>x.paused===1);
+  await key('Enter');await until(x=>x.phase===1&&x.round===2);
+  check(s().playerCell===2&&s().enemyCell===4&&s().playerEnergy===6,'Movement resolution failed');
+  await queue('38');await key('Enter');await until(x=>x.phase===1&&x.round===3);
+  check(s().playerHealth===21&&s().enemyHealth===12,'Combat result differs from rules');
+  await key('KeyH');await key('Digit1');check(s().help===1&&s().slots===0,'Help did not block input');
+  await key('Enter');check(s().help===0,'Help did not close');
+  const b=c.getBoundingClientRect();
+  const mouse=type=>c.dispatchEvent(new MouseEvent(type,{button:0,clientX:b.x+150/1280*b.width,clientY:b.y+745/920*b.height,bubbles:true}));
+  mouse('mousemove');mouse('mousedown');await wait(80);mouse('mouseup');await until(x=>x.queued===1);
+  await key('KeyR');check(s().stage===0&&s().round===1&&s().slots===0&&s().playerHealth===24,'Restart failed');
+  return {passed:['boot','planning','capacity','fixed enemy intent','undo','partial-plan guard','three-beat playback','pause','blur pause','movement','combat damage','help','mouse cards','restart'],state:s(),requests:performance.getEntriesByType('resource').map(x=>x.name)};
+}
